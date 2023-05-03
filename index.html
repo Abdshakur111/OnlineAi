@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Facebook Chatbot</title>
+</head>
+<body>
+  <h1>My Facebook Chatbot</h1>
+  <script>
+    // Add your Facebook Page Access Token and Verify Token here
+    const ACCESS_TOKEN = 'your_access_token_here';
+    const VERIFY_TOKEN = 'your_verify_token_here';
+    
+    // Add your OpenAI API key here
+    const OPENAI_API_KEY = 'your_openai_api_key_here';
+    
+    // Handle incoming messages from Facebook Messenger
+    function handleWebhook(req, res) {
+      if (req.method === 'GET' && req.query['hub.verify_token'] === VERIFY_TOKEN) {
+        res.send(req.query['hub.challenge']);
+      } else if (req.method === 'POST') {
+        let message = req.body.entry[0].messaging[0];
+        let senderId = message.sender.id;
+        let messageText = message.message.text;
+        generateResponse(messageText).then(responseText => {
+          sendMessage(senderId, responseText);
+        });
+        res.sendStatus(200);
+      } else {
+        res.sendStatus(400);
+      }
+    }
+    
+    // Generate a response using the OpenAI API
+    async function generateResponse(messageText) {
+      let response = await fetch('https://api.openai.com/v1/engines/davinci/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + OPENAI_API_KEY
+        },
+        body: JSON.stringify({
+          'prompt': messageText + '\nAI:',
+          'temperature': 0.5,
+          'max_tokens': 2048,
+          'top_p': 1
+        })
+      });
+      let responseJson = await response.json();
+      let responseText = responseJson.choices[0].text.trim();
+      return responseText;
+    }
+    
+    // Send a message back to the user
+    function sendMessage(recipientId, responseText) {
+      fetch('https://graph.facebook.com/v12.0/me/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + ACCESS_TOKEN
+        },
+        body: JSON.stringify({
+          'recipient': {
+            'id': recipientId
+          },
+          'message': {
+            'text': responseText
+          }
+        })
+      });
+    }
+  </script>
+</body>
+</html>
